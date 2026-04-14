@@ -8,12 +8,27 @@ const client = axios.create({
   },
 });
 
-const normalizeUser = (user) => ({
-  ...user,
-  name: user.user_name || user.name,
-  email: user.user_email || user.email,
-  saved_stocks: user.saved_stocks ?? [],
-});
+const normalizeUser = (user) => {
+  let saved_stocks = [];
+  if (user.saved_stocks) {
+    if (typeof user.saved_stocks === 'string') {
+      try {
+        saved_stocks = JSON.parse(user.saved_stocks);
+      } catch {
+        saved_stocks = [];
+      }
+    } else if (Array.isArray(user.saved_stocks)) {
+      saved_stocks = user.saved_stocks;
+    }
+  }
+  
+  return {
+    ...user,
+    name: user.user_name || user.name,
+    email: user.user_email || user.email,
+    saved_stocks,
+  };
+};
 
 export async function signupUser({ name, email, password, date_of_birth }) {
   const payload = {
@@ -38,7 +53,17 @@ export async function loginUser({ email, password }) {
 
 export async function fetchSavedStocks(email) {
   const response = await client.get(`/api/users/${encodeURIComponent(email)}`);
-  return response.data.saved_stocks ?? [];
+  const saved_stocks = response.data.saved_stocks;
+  
+  if (typeof saved_stocks === 'string') {
+    try {
+      return JSON.parse(saved_stocks);
+    } catch {
+      return [];
+    }
+  }
+  
+  return Array.isArray(saved_stocks) ? saved_stocks : [];
 }
 
 export async function updateSavedStocks(email, savedStocks) {
