@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Chart from '../components/Chart';
+import { getRecommendation } from '../api';
 import '../styles/DetailsPage.css';
+
 
 // Request cache to prevent duplicate API calls
 const requestCache = new Map();
@@ -8,9 +10,12 @@ const requestCache = new Map();
 export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
   const [stock, setStock] = useState(null);
   const [chartData, setChartData] = useState({ categories: [], values: [] });
+  const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
+
 
   useEffect(() => {
     let isActive = true;
@@ -65,6 +70,10 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
             setStock(cachedData.stock);
             setChartData(cachedData.chartData);
             setLoading(false);
+            // Load recommendation
+            if (cachedData.stock.symbol) {
+              loadRecommendation(cachedData.stock.symbol);
+            }
           }
           return;
         }
@@ -105,6 +114,12 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
               ? (quote.regularMarketChange / quote.regularMarketPrice) * 100
               : null),
           quoteType: quote.quoteType || 'Equity',
+          dayHigh: quote.regularMarketDayHigh ?? null,
+          dayLow: quote.regularMarketDayLow ?? null,
+          fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? null,
+          fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? null,
+          volume: quote.regularMarketVolume ?? null,
+          averageVolume: quote.averageVolume ?? null,
         };
 
         if (isActive) {
@@ -143,6 +158,9 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
           setChartData(chartDataResult);
           // Cache the data
           requestCache.set(cacheKey, { stock: stockData, chartData: chartDataResult });
+          
+          // Load recommendation
+          loadRecommendation(stockData.symbol);
         }
       } catch (fetchError) {
         if (fetchError?.name === 'AbortError') {
@@ -159,6 +177,26 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
       }
     }
 
+    const loadRecommendation = async (currentSymbol) => {
+      if (!currentSymbol) return;
+      setLoadingRecommendation(true);
+      try {
+        const rec = await getRecommendation(currentSymbol);
+        if (isActive) {
+          setRecommendation(rec);
+        }
+      } catch (err) {
+        console.error('Recommendation error:', err);
+        if (isActive) {
+          setError('Stock loaded but recommendation service unavailable');
+        }
+      } finally {
+        if (isActive) {
+          setLoadingRecommendation(false);
+        }
+      }
+    };
+
     loadStock();
 
     return () => {
@@ -166,6 +204,7 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
       isActive = false;
     };
   }, [symbol, name]);
+
 
   const handleSave = () => {
     if (stock) {
@@ -179,64 +218,165 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
     <div className="details-page">
       <div className="details-header">
         <button className="back-button" onClick={onBack}>
-          ← Back
+          <span className="back-icon">←</span> Back
         </button>
         <div className="details-title-group">
-          <div className="details-title">{name || symbol}</div>
+          <div className="details-title">
+            <span className="stock-symbol">{symbol}</span>
+            <span className="stock-name">{name}</span>
+          </div>
           <button className="save-button" onClick={handleSave}>
-            Save
+            <span className="save-icon">★</span> Save
           </button>
         </div>
       </div>
 
-      {savedMessage && <div className="saved-message">{savedMessage}</div>}
+      {savedMessage && <div className="saved-message">✓ {savedMessage}</div>}
 
       {loading ? (
-        <div className="details-loading">Loading stock details...</div>
+        <div className="details-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading stock details...</p>
+        </div>
       ) : error ? (
-        <div className="details-error">{error}</div>
+        <div className="details-error">
+          <span className="error-icon">⚠</span> {error}
+        </div>
       ) : (
         stock && (
-          <div className="details-grid">
-            <div className="details-card">
-              <div className="stock-card-header">Stock Overview</div>
-              <div className="stock-item">
-                <span>Symbol</span>
-                <strong>{stock.symbol}</strong>
+          <div className="details-content">
+            {/* Price Hero Section */}
+            <div className="price-hero">
+              <div className="price-main">
+                <span className="price-label">Current Price</span>
+                <div className="price-value">
+                  {stock.price != null ? `$${stock.price.toFixed(2)}` : 'N/A'}
+                </div>
+                <div className={`price-change ${stock.change >= 0 ? 'positive' : 'negative'}`}>
+                  <span className="change-icon">{stock.change >= 0 ? '▲' : '▼'}</span>
+                  {stock.change != null ? `$${stock.change.toFixed(2)}` : '$0.00'} 
+                  ({stock.changePercent != null ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : '0.00%'})
+                </div>
               </div>
-              <div className="stock-item">
-                <span>Name</span>
-                <strong>{stock.name}</strong>
-              </div>
-              <div className="stock-item">
-                <span>Exchange</span>
-                <strong>{stock.exchange}</strong>
-              </div>
-              <div className="stock-item">
-                <span>Quote type</span>
-                <strong>{stock.quoteType}</strong>
-              </div>
-              <div className="stock-item">
-                <span>Currency</span>
-                <strong>{stock.currency}</strong>
-              </div>
-            </div>
-
-            <div className="details-card price-card">
-              <div className="stock-card-header">Market Price</div>
-              <div className="price-value">
-                {stock.price != null ? `${stock.price} ${stock.currency}` : 'N/A'}
-              </div>
-              <div className={`price-change ${stock.change >= 0 ? 'positive' : 'negative'}`}>
-                {stock.change != null ? stock.change.toFixed(2) : '0.00'} ({stock.changePercent != null ? stock.changePercent.toFixed(2) : '0.00'}%)
+              <div className="price-meta">
+                <div className="meta-item">
+                  <span className="meta-label">Currency</span>
+                  <span className="meta-value">{stock.currency}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Exchange</span>
+                  <span className="meta-value">{stock.exchange}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Type</span>
+                  <span className="meta-value">{stock.quoteType}</span>
+                </div>
               </div>
             </div>
 
+            {/* Stats Grid */}
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span className="stat-icon">📈</span>
+                  Day Range
+                </div>
+                <div className="stat-values">
+                  <span className="stat-low">L: {stock.dayLow != null ? `$${stock.dayLow.toFixed(2)}` : 'N/A'}</span>
+                  <span className="stat-high">H: {stock.dayHigh != null ? `$${stock.dayHigh.toFixed(2)}` : 'N/A'}</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span className="stat-icon">📊</span>
+                  52 Week Range
+                </div>
+                <div className="stat-values">
+                  <span className="stat-low">L: {stock.fiftyTwoWeekLow != null ? `$${stock.fiftyTwoWeekLow.toFixed(2)}` : 'N/A'}</span>
+                  <span className="stat-high">H: {stock.fiftyTwoWeekHigh != null ? `$${stock.fiftyTwoWeekHigh.toFixed(2)}` : 'N/A'}</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span className="stat-icon">📉</span>
+                  Volume
+                </div>
+                <div className="stat-value-large">
+                  {stock.volume != null ? stock.volume.toLocaleString() : 'N/A'}
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span className="stat-icon">⚖</span>
+                  Avg Volume
+                </div>
+                <div className="stat-value-large">
+                  {stock.averageVolume != null ? stock.averageVolume.toLocaleString() : 'N/A'}
+                </div>
+              </div>
+            </div>
+
+            {/* Chart Section */}
             <div className="chart-section">
+              <div className="chart-header">
+                <h3>📈 Price History - 1 Month</h3>
+              </div>
               {chartData.categories.length > 0 ? (
                 <Chart categories={chartData.categories} values={chartData.values} title={`${stock.symbol} - 1 Month`} />
               ) : (
-                <div className="chart-empty">Chart data unavailable for this symbol.</div>
+                <div className="chart-empty">
+                  <span className="empty-icon">📊</span>
+                  <p>Chart data unavailable for this symbol.</p>
+                </div>
+              )}
+            </div>
+
+            {/* AI Recommendation Card */}
+            <div className="recommendation-section">
+              {recommendation && (
+                <div className="recommendation-card">
+                  <div className="recommendation-header">
+                    <span className="rec-icon">🤖</span>
+                    <span className="rec-title">AI Recommendation</span>
+                  </div>
+                  <div className="recommendation-body">
+                    <div className={`rec-badge ${recommendation.recommendation.toLowerCase()}`}>
+                      {recommendation.recommendation.toUpperCase()}
+                      <span className="rec-confidence">{(recommendation.confidence * 100).toFixed(0)}% confidence</span>
+                    </div>
+                    <div className="rec-reason">
+                      {recommendation.reason}
+                    </div>
+                    <div className="analysis-grid">
+                      <div className="analysis-item">
+                        <span>Momentum</span>
+                        <strong>{recommendation.analysis.momentum}</strong>
+                      </div>
+                      <div className="analysis-item">
+                        <span>RSI</span>
+                        <strong>{recommendation.analysis.rsi}</strong>
+                      </div>
+                      <div className="analysis-item">
+                        <span>Sentiment</span>
+                        <strong>{recommendation.analysis.news_sentiment}</strong>
+                      </div>
+                      <div className="analysis-item">
+                        <span>Trend</span>
+                        <strong>{recommendation.analysis.price_trend}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="recommendation-footer">
+                    ⚠️ AI analysis based on technical indicators and news sentiment. Not financial advice.
+                  </div>
+                </div>
+              )}
+
+              {loadingRecommendation && (
+                <div className="recommendation-loading">
+                  <div className="loading-spinner"></div>
+                  <p>Analyzing market data and news sentiment...</p>
+                </div>
               )}
             </div>
           </div>
@@ -245,3 +385,4 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
     </div>
   );
 }
+

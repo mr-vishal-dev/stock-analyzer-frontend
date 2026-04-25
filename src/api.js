@@ -79,3 +79,9 @@ export async function saveStock(email, stock) {
   });
   return response.data;
 }
+
+export async function getRecommendation(symbol) {
+  const response = await client.post('/api/recommend', { symbol });
+  return response.data;
+}
+
