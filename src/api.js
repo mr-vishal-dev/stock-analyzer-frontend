@@ -81,7 +81,9 @@ export async function saveStock(email, stock) {
 }
 
 export async function getRecommendation(symbol) {
+  console.log('API: Calling recommend for symbol:', symbol);
   const response = await client.post('/api/recommend', { symbol });
+  console.log('API: Recommendation response:', response.data);
   return response.data;
 }
 

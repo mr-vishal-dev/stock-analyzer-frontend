@@ -181,7 +181,10 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
       if (!currentSymbol) return;
       setLoadingRecommendation(true);
       try {
+        console.log('Loading recommendation for:', currentSymbol);
         const rec = await getRecommendation(currentSymbol);
+        console.log('Recommendation received:', rec);
+        console.log('News sentiment value:', rec?.analysis?.news_sentiment);
         if (isActive) {
           setRecommendation(rec);
         }
