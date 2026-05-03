@@ -3,6 +3,8 @@ import Chart from '../components/Chart';
 import { getRecommendation } from '../api';
 import '../styles/DetailsPage.css';
 
+const YAHOO_API_HOST = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const YAHOO_API_BASE = YAHOO_API_HOST ? `${YAHOO_API_HOST}/yahoo` : '/yahoo';
 
 // Request cache to prevent duplicate API calls
 const requestCache = new Map();
@@ -78,7 +80,7 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
           return;
         }
 
-        const searchUrl = `/yahoo/v1/finance/search?q=${encodeURIComponent(symbol)}`;
+        const searchUrl = `${YAHOO_API_BASE}/v1/finance/search?q=${encodeURIComponent(symbol)}`;
         console.log('Fetching stock data from:', searchUrl);
         const searchJson = await fetchWithRetry(searchUrl);
         if (!searchJson) return;
@@ -129,7 +131,7 @@ export default function DetailsPage({ symbol, name, onBack, onSaveStock }) {
         // Add delay between requests to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const chartUrl = `/yahoo/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo`;
+        const chartUrl = `${YAHOO_API_BASE}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo`;
         console.log('Fetching chart data from:', chartUrl);
         const chartJson = await fetchWithRetry(chartUrl);
         if (!chartJson) return;

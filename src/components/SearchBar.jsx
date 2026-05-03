@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/SearchBar.css';
 
+const SEARCH_API_HOST = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE = SEARCH_API_HOST ? `${SEARCH_API_HOST}/yahoo` : '/yahoo';
+
 export default function SearchBar({ onSelectStock }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -8,8 +11,6 @@ export default function SearchBar({ onSelectStock }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const debounceTimerRef = useRef(null);
-
-  const API_BASE = '/yahoo';
 
   const popularStocks = [
     { symbol: 'TCS.NS', name: 'Tata Consultancy Services' },
